@@ -28,6 +28,16 @@ sh: ## demo of my shell
 push: ## save to cloud
 	@read -p "Reason? " msg; git commit -am "$$msg"; git push; git status
 
+CSVS=ls -r ~/gits/moot/optimize/*/*.csv | xargs -P 20 -I {} sh -c 
+
+~/tmp/peeksrun.log :
+	@$(CSVS) 'python3 -B peeks.py --run {} 2>&1' | tee $@
+	cut -d \  -f 1 $@ | sort -n | fmt -65
+
+~/tmp/peeksguess.log :
+	@$(CSVS) 'python3 -B peeks.py --guess {} 2>&1' | tee $@
+	cut -d \  -f 1 $@ | sort -n | fmt -65
+
 Html := $(GIT_ROOT)/docs
 
 docs: $(Html)/peek.html $(Html)/peek.pdf
