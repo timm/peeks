@@ -204,11 +204,11 @@ def treeShow(oracle, t, lvl=0):
 #   |_| |_| |_.__/ 
                 
 def o(it: Any) -> str:
-  of = isinstance
+  a = lambda t: isinstance(it,t)
   if callable(it): return it.__name__
-  if of(it,float): return f"{it:.{the.decs}f}"
-  if of(it,dict): return "{"+ ", ".join(f"{k}={o(v)}" for k,v in it.items())+"}"
-  if of(it,list): return "{"+", ".join(map(o, it))+"}"
+  if a(float): return f"{it:.{the.decs}f}"
+  if a(dict):  return "{"+ ", ".join(f"{k}={o(v)}" for k,v in it.items())+"}"
+  if a(list):  return "{"+", ".join(map(o, it))+"}"
   return str(it)
 
 def cli() -> None:
