@@ -214,12 +214,13 @@ def o(it: Any) -> str:
 def cli() -> None:
   args = [thing(x) for x in sys.argv[1:]]
   while args:
-    random.seed(the.seed)
     k = re.sub(r"^-+", "", args.pop(0))
-    if fn := globals().get(f"test_{k}"): 
-      fn(*[args.pop(0) for _ in fn.__annotations__ if args])
-    elif k in the: 
-      the[k] = args.pop(0)
+    for k1,fn in tests():
+      if k1[4:] == k:
+        fn(*[args.pop(0) for _ in fn.__annotations__ if args])
+        break
+    else:
+      if k in the: the[k] = args.pop(0)
 
 def thing(txt: str) -> Atom:
   txt = txt.strip()
@@ -247,12 +248,12 @@ def csv(f: str, clean=clean):
 def tests(*ignore):
   for k, fn in list(globals().items()):
     if k.startswith("test_") and k not in ignore:
-       yield k,fn
+      random.seed(the.seed)
+      yield k,fn
    
 def test_all():
   for k, fn in tests("test_all", "test_h", "test_help"):
     print(f"? {k} :",end="")
-    random.seed(the.seed)
     try: fn(); print(f"✅ PASS")
     except Exception as e: print(f"❌ FAIL: {e}")
 
