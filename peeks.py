@@ -1,4 +1,18 @@
 #!/usr/bin/env python3 -B
+#                            __                                         
+#                           /\ \                                        
+#   _____      __      __   \ \ \/'\      ____       _____    __  __    
+#  /\ '__`\  /'__`\  /'__`\  \ \ , <     /',__\     /\ '__`\ /\ \/\ \   
+#  \ \ \L\ \/\  __/ /\  __/   \ \ \\`\  /\__, `\ __ \ \ \L\ \\ \ \_\ \  
+#   \ \ ,__/\ \____\\ \____\   \ \_\ \_\\/\____//\_\ \ \ ,__/ \/`____ \ 
+#    \ \ \/  \/____/ \/____/    \/_/\/_/ \/___/ \/_/  \ \ \/   `/___/> \
+#     \ \_\                                            \ \_\      /\___/
+#      \/_/                                             \/_/      \/__/ 
+
+# Very simple explainable AI: optimization via landscape analysus
+# (c) 2006 Tim Menzies <timm@ieee.org> MIT license
+# http://github.com/timm/peeks
+
 from __future__ import annotations
 import os, re, random, sys, bisect, math
 from pathlib import Path
@@ -14,6 +28,12 @@ the = obj(
   file= Path.home() / "gits/moot/optimize/misc/auto93.csv")
 
 #--------------------------------------------------------------------
+#        _   _     
+#     __| | | |__  
+#    / _` | | '_ \ 
+#   | (_| | | |_) |
+#    \__,_| |_.__/ 
+
 def Num(txt: str = "", at: int = 0):
   return obj(it=Num, txt=txt, at=at, n=0, mu=0, m2=0, sd=0, heaven=txt[-1:] != "-")
 
@@ -93,13 +113,41 @@ def aha(i: Col, u: Any, v: Any) -> float:
   v = v if v != "?" else (0 if u > 0.5 else 1)
   return abs(u - v)
 
+def wins(d):
+  d.rows.sort(key=lambda r: disty(d,r))
+  lo = disty(d, d.rows[0])
+  md = disty(d, d.rows[len(d.rows)//2])
+  return lambda r: int(100*(1 - (disty(d,r) - lo) / (md - lo + 0.0001)))
+
+
+#--------------------------------------------------------------------
+#     __ _  (_)
+#    / _` | | |
+#   | (_| | | |
+#    \__,_| |_|
+            
+def peeks(oracle,rows, K=5, budget=30, 
+        label=lambda d,r: r):
+  def Y(r):     return disty(oracle, label(oracle,r))
+  def score(u): return sum(distx(model,unlab[u],model.rows[i])/(i+1)
+                           for i in range(K))
+  random.shuffle(rows)
+  unlab = rows[K:][:the.few]
+  model = clone(oracle, rows[:K])
+  model.rows.sort(key=Y)
+  for j in range(budget-K-the.check):
+    if not unlab: break
+    add(model, unlab.pop(min(range(len(unlab)), key=score)))
+    model.rows = sorted(model.rows, key=Y)[:budget]
+  return model
+
 #--------------------------------------------------------------------
 def Tree(oracle, rows, stop=4):
-  def splitter(c, top, bot):
+  def cut(c, top, bot):
     a, b = mid(top.cols.all[c.at]), mid(bot.cols.all[c.at])
     return (a + b) / 2 if c.it is Num else a
 
-  def partition(c, v, rows):
+  def kids(c, v, rows):
     left, right, yl, yr = [], [], Num(), Num()
     for r in rows:
       if   r[c.at] == "?": right.append(r)
@@ -109,25 +157,26 @@ def Tree(oracle, rows, stop=4):
         right.append(r); add(yr, disty(oracle, r))
     sl = f"{c.txt} <= {o(v)}" if c.it is Num else f"{c.txt} == {o(v)}"
     sr = f"{c.txt} >  {o(v)}" if c.it is Num else f"{c.txt} != {o(v)}"
-    return left, right, yl, yr, sl, sr
+    return (left,right,yl,yr,sl,sr)
 
-  def grow(here, pre=""):
+  def grow(here, pre="", stats=None):
     here.pre  = pre
+    here.stats = stats
     here.kids = []
     if len(here.rows) > stop*2:
       rs = sorted(here.rows, key=lambda r: disty(oracle, r))
-      best, bv, bl, br, sl, sr = None, 1e32, None, None, None, None
+      best bv,bl,br,sl,sr,yl,yr = None,1e32,None,None,None,None,None,None
       for c in oracle.cols.xs:
-        v= splitter(c, clone(oracle, rs[:len(rs)//2]),
-                       clone(oracle, rs[len(rs)//2:]))
-        l,r,yl,yr,s1,s2 = partition(c, v, here.rows)
+        v= cut(c, clone(oracle, rs[:len(rs)//2]),
+                  clone(oracle, rs[len(rs)//2:]))
+        l,r,_yl,_yr,s1,s2 = kids(c, v, here.rows)
         if l and r:
-          w = spread(yl)*yl.n + spread(yr)*yr.n
-          if w < bv: best,bv,bl,br,sl,sr = (c,v),w,l,r,s1,s2
+          w = spread(_yl)*_yl.n + spread(_yr)*_yr.n
+          if w < bv: best,bv,bl,br,sl,sr,yl,yr = (c,v),w,l,r,s1,s2,_yl,_yr
       if best:
         here.cut  = best
-        here.kids = [grow(clone(oracle,bl), sl),
-                     grow(clone(oracle,br), sr)]
+        here.kids = [grow(clone(oracle,bl), sl,yl),
+                     grow(clone(oracle,br), sr,yr)]
     return here
   return grow(clone(oracle, rows))
 
@@ -146,24 +195,14 @@ def treeShow(oracle, t, lvl=0):
   else:
     print(f"{label}")
   for k in t.kids: treeShow(oracle, k, lvl+1)
- 
-#--------------------------------------------------------------------
-def run(oracle,rows, K=5, budget=30, 
-        label=lambda d,r: r):
-  def Y(r):     return disty(oracle, label(oracle,r))
-  def score(u): return sum(distx(model,unlab[u],model.rows[i])/(i+1)
-                           for i in range(K))
-  random.shuffle(rows)
-  unlab = rows[K:][:the.few]
-  model = clone(oracle, rows[:K])
-  model.rows.sort(key=Y)
-  for j in range(budget-K-the.check):
-    if not unlab: break
-    add(model, unlab.pop(min(range(len(unlab)), key=score)))
-    model.rows = sorted(model.rows, key=Y)[:budget]
-  return model
-   
-#--------------------------------------------------------------------
+  
+#--------------------------------------------------------------------
+#    _   _   _     
+#   | | (_) | |__  
+#   | | | | | '_ \ 
+#   | | | | | |_) |
+#   |_| |_| |_.__/ 
+                
 def o(it: Any) -> str:
   of = isinstance
   if callable(it): return it.__name__
@@ -199,6 +238,31 @@ def csv(f: str, clean=clean):
         yield [thing(x) for x in r]     
 
 #--------------------------------------------------------------------
+#    _                  _   
+#   | |_    ___   ___  | |_ 
+#   | __|  / _ \ / __| | __|
+#   | |_  |  __/ \__ \ | |_ 
+#    \__|  \___| |___/  \__|
+                         
+def tests(*ignore):
+  for k, fn in list(globals().items()):
+    if k.startswith("test_") and k not in ignore:
+       yield k,fn
+   
+def test_all():
+  for k, fn in tests("test_all", "test_h", "test_help"):
+    print(f"? {k} :",end="")
+    random.seed(the.seed)
+    try: fn(); print(f"✅ PASS")
+    except Exception as e: print(f"❌ FAIL: {e}")
+
+def test_h():
+  print("Usage: scan.py [--all] [--test_name] [args...]")
+  for k, fn in tests():
+     print(f"  --{k[5:]:10} {' '.join(fn.__annotations__)}") 
+
+test_help = test_h
+
 def test_the(): print(o(the))
 
 def test_csv(file=the.file):
@@ -209,32 +273,28 @@ def test_data(file=the.file):
   [print("x",x) for x in d.cols.xs]
   [print("y",y) for y in d.cols.ys]
 
-def wins(d):
-  d.rows.sort(key=lambda r: disty(d,r))
-  lo = disty(d, d.rows[0])
-  md = disty(d, d.rows[len(d.rows)//2])
-  return lambda r: int(100*(1 - (disty(d,r) - lo) / (md - lo + 1e-32)))
-
 def test_run(file: str = the.file):
   d   = Data(csv(file))
   W   = wins(d)
-  best = [run(d, d.rows, K=the.K, budget=the.budget).rows[0]
+  best = [peeks(d, d.rows, K=the.K, budget=the.budget).rows[0]
           for _ in range(20)]
   stats = adds(W(r) for r in best)
   print(int(stats.mu), int(stats.sd))
 
 def test_guess(file: str = the.file):
-  d    = Data(csv(file))
-  W    = wins(d)
+  d     = Data(csv(file))
+  W     = wins(d)
   stats = Num()
   for _ in range(20):
     random.shuffle(d.rows)
-    n = len(d.rows) // 2
-    t = Tree(d, d.rows[:n])
+    n     = len(d.rows) // 2
+    model = peeks(d, d.rows[:n], K=the.K, budget=the.budget)
+    tree   = Tree(model, model.rows)
+    sorted(d.rows[n:], key=lambda r: treeLeaf(tree,r).rows
     add(stats, W(max(sorted(d.rows[n:],
-                key=lambda r: W(treeLeaf(t,r).rows[0]),
-                reverse=True)[:the.check], key=W))) 
+                            key=lambda r: W(treeLeaf(t,r).rows[0]),
+                            reverse=True)[:the.check], key=W)))
   print(int(stats.mu))
- 
+
 #--------------------------------------------------------------------
 if __name__ == "__main__": cli()

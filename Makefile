@@ -32,12 +32,29 @@ CSVS=ls -r ~/gits/moot/optimize/*/*.csv | xargs -P 20 -I {} sh -c
 
 ~/tmp/peeksrun.log :
 	@$(CSVS) 'python3 -B peeks.py --run {} 2>&1' | tee $@
-	cut -d \  -f 1 $@ | sort -n | fmt -65
+	cut -d \  -f 1 $@ | sort -n | fmt -17 #65
 
 ~/tmp/peeksguess.log :
 	@$(CSVS) 'python3 -B peeks.py --guess {} 2>&1' | tee $@
 	cut -d \  -f 1 $@ | sort -n | fmt -65
 
+~/tmp/%.pdf: %.py $(MAKEFILE_LIST) ## .py ==> .pdf
+	@mkdir -p ~/tmp
+	@echo "pdf-ing $@ ... "
+	@a2ps -Br --quiet --landscape --chars-per-line=90 --line-numbers=1  \
+	          --borders=no --pro=color --columns=3 -M letter -o - $< \
+						| ps2pdf - $@
+	@open $@
+
+# K=1
+#
+# -345381173658630070302088494055424 1 8 15 16 27 33 35 35 42 42 43
+#  44 44 45 45 46 46 47 47 47 48 50 50 50 50 50 51 51 52 52 53 53 54
+#  55 56 56 56 56 59 59 59 59 60 60 61 61 63 64 64 67 68 69 70 71 71
+#  72 74 74 76 76 76 76 76 77 78 78 78 79 79 80 81 81 81 82 82 82 83
+#  83 84 84 85 87 87 87 88 88 88 88 89 89 89 90 91 92 92 92 93 93 93
+#  93 93 94 94 94 94 95 95 95 95 95 95 96 96 96 96 96 97 97 97 97 97
+# K=K
 Html := $(GIT_ROOT)/docs
 
 docs: $(Html)/peek.html $(Html)/peek.pdf
