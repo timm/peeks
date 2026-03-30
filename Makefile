@@ -28,7 +28,7 @@ sh: ## demo of my shell
 push: ## save to cloud
 	@read -p "Reason? " msg; git commit -am "$$msg"; git push; git status
 
-CSVS=ls -r ~/gits/moot/optimize/*/*.csv | xargs -P 20 -I {} sh -c 
+CSVS=ls -r ~/gits/moot/optimize/*/*.csv | xargs -P 32 -I {} sh -c 
 
 ~/tmp/peeksrun.log :
 	@$(CSVS) 'python3 -B peeks.py --run {} 2>&1' | tee $@

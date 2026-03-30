@@ -24,7 +24,7 @@ class obj(dict):
   __repr__ = lambda i : o(i)
 
 the = obj(
-  decs=2, seed=1, p=2, few=128, budget=30, K=5, treeWidth=30, check=5,
+  decs=2, seed=1, p=2, budget=50, K=5, treeWidth=30, check=5,start=4,
   file= Path.home() / "gits/moot/optimize/misc/auto93.csv")
 
 #--------------------------------------------------------------------
@@ -61,22 +61,24 @@ def clone(d,rows=None):
 def adds(src,i=None):
   i = i or Num(); [add(i,v) for v in src]; return i
 
-def add(i: Data|Col, v: Any, w=1) -> Any:
-  if v != "?":
-    if i.it is Data:
-      i.mid = None
-      [add(c, v[c.at], w) for c in i.cols.all] 
-      i.rows += [v]
+def add(i, v, w=1):
+  if v == "?": return v
+  if   i.it is Data:
+    i.mid = None
+    [add(c, v[c.at], w) for c in i.cols.all]
+    i.rows += [v]
+  elif i.it is Sym:
+    i.n += w; i.has[v] = w + i.has.get(v, 0)
+  else:
+    i.n += w
+    if w < 0 and i.n <= 2: i.n = i.sd = i.m2 = i.mu = 0
     else:
-      i.n += w
-      if  i.it is Sym: i.has[v] = w + i.has.get(v, 0)
-      else:
-        delta = v - i.mu
-        i.mu += w * delta / i.n
-        i.m2 += w * delta * (v - i.mu)
-        i.sd  = 0 if i.n < 2 else sqrt(max(0, i.m2) / (i.n - 1))
+      delta  = v - i.mu
+      i.mu  += w * delta / i.n
+      i.m2  += w * delta * (v - i.mu)
+      i.sd   = 0 if i.n < 2 else sqrt(max(0, i.m2) / (i.n - 1))
   return v
-
+ 
 #--------------------------------------------------------------------
 def mids(d:Data):
   d.mids = d.mids or [mid(c) for c in d.cols.all]
@@ -119,27 +121,33 @@ def wins(d):
   md = disty(d, d.rows[len(d.rows)//2])
   return lambda r: int(100*(1 - (disty(d,r) - lo) / (md - lo + 0.0001)))
 
-
 #--------------------------------------------------------------------
 #     __ _  (_)
 #    / _` | | |
 #   | (_| | | |
 #    \__,_| |_|
             
-def peeks(oracle,rows, K=5, budget=30, 
-        label=lambda d,r: r):
-  def Y(r):     return disty(oracle, label(oracle,r))
-  def score(u): return sum(distx(model,unlab[u],model.rows[i])/(i+1)
-                           for i in range(K))
-  random.shuffle(rows)
-  unlab = rows[K:][:the.few]
-  model = clone(oracle, rows[:K])
-  model.rows.sort(key=Y)
-  for j in range(budget-K-the.check):
-    if not unlab: break
-    add(model, unlab.pop(min(range(len(unlab)), key=score)))
-    model.rows = sorted(model.rows, key=Y)[:budget]
-  return model
+def memo(fn):
+  cache = {}
+  def cached(r):
+    v = id(r)
+    if v not in cache: cache[v] = fn(r)
+    return cache[v]
+  return cached,cache
+
+def peeks(d, label=lambda _,r:r):
+  Y,labelled = memo(lambda r : disty(d,r))
+  rows = d.rows[:]
+  shuffle(rows)
+  unlab = rows[the.start:]
+  lab   = clone(d, rows[:the.start])
+  lab.rows.sort(key=Y)
+  while unlab and len(labelled) < the.budget:
+    idxs = sample(range(len(unlab)), min(the.check, len(unlab)))
+    best = idxs[0] #sample(unlab.rows) #min(idxs, key=lambda i: distx(lab, unlab[i], lab.rows[0]))
+    add(lab, unlab.pop(best))
+    lab.rows.sort(key=Y)
+  return lab
 
 #--------------------------------------------------------------------
 def Tree(oracle, rows, stop=4):
@@ -165,7 +173,7 @@ def Tree(oracle, rows, stop=4):
     here.kids = []
     if len(here.rows) > stop*2:
       rs = sorted(here.rows, key=lambda r: disty(oracle, r))
-      best bv,bl,br,sl,sr,yl,yr = None,1e32,None,None,None,None,None,None
+      best,bv,bl,br,sl,sr,yl,yr = None,1e32,None,None,None,None,None,None
       for c in oracle.cols.xs:
         v= cut(c, clone(oracle, rs[:len(rs)//2]),
                   clone(oracle, rs[len(rs)//2:]))
@@ -175,8 +183,7 @@ def Tree(oracle, rows, stop=4):
           if w < bv: best,bv,bl,br,sl,sr,yl,yr = (c,v),w,l,r,s1,s2,_yl,_yr
       if best:
         here.cut  = best
-        here.kids = [grow(clone(oracle,bl), sl,yl),
-                     grow(clone(oracle,br), sr,yr)]
+        here.kids = [grow(clone(oracle,bl),sl,yl), grow(clone(oracle,br),sr,yr)]
     return here
   return grow(clone(oracle, rows))
 
@@ -216,7 +223,7 @@ def cli() -> None:
   while args:
     k = re.sub(r"^-+", "", args.pop(0))
     for k1,fn in tests():
-      if k1[4:] == k:
+      if k1[5:] == k:
         fn(*[args.pop(0) for _ in fn.__annotations__ if args])
         break
     else:
@@ -289,13 +296,12 @@ def test_guess(file: str = the.file):
   for _ in range(20):
     random.shuffle(d.rows)
     n     = len(d.rows) // 2
-    model = peeks(d, d.rows[:n], K=the.K, budget=the.budget)
-    tree   = Tree(model, model.rows)
-    sorted(d.rows[n:], key=lambda r: treeLeaf(tree,r).rows
+    model = peeks(clone(d, d.rows[:n]))
+    tree  = Tree(d, model.rows)
     add(stats, W(max(sorted(d.rows[n:],
-                            key=lambda r: W(treeLeaf(t,r).rows[0]),
-                            reverse=True)[:the.check], key=W)))
+                        key=lambda r: W(treeLeaf(tree,r).rows[0]),
+                        reverse=True)[:the.check], key=W)))
   print(int(stats.mu))
-
+ 
 #--------------------------------------------------------------------
 if __name__ == "__main__": cli()
