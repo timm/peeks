@@ -2134,47 +2134,6 @@ of features on top of images (e.g., captions, tables, video, audio,
 floating) that would interfere. To put an image in a link, use an HTML
 image. For example:
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ none
-[Link <img src="logo.png"> with image](https://myurl)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-<!-- Used for escaping script and style tags in this particular document -->
-<script>
-setTimeout(function() {
-  var tagArray = document.getElementsByTagName('tag');
-  for (var i = 0; i < tagArray.length; ++i) {
-      tagArray[i].innerHTML = '&lt;' + tagArray[i].innerHTML + '&gt;';
-  }
-}, 1000);
-</script>
-
-<!-- Display the language table in this particular document -->
-<script>
-setTimeout(function () {
-   var k = Object.keys(markdeep.langTable);
-
-   // Language names to codes
-   var mapping = {};
-   for (var i = 0; i < k.length; ++i) {
-      var language = markdeep.langTable[k[i]];
-      var name = language.name || 'English';
-      if (! mapping[name]) { mapping[name] = []; }
-      mapping[name].push(k[i]);
-   }
-   
-   // Get all of the names
-   var k = Object.keys(mapping);
-   k.sort();
-   
-   var s = '<table class="table"><tr><th>Name</th><th>Codes</th></tr>\n';
-   for (var i = 0; i < k.length; ++i) {
-      var codes = mapping[k[i]];
-      codes.sort();
-      s += '<tr><td>' + k[i] + '</td><td><code>' + codes.join('</code>, <code>') + '</code></td></tr>\n';
-   }
-   s += '</table>'
-   document.getElementById('langTable').innerHTML = s;
-}, 1000);
-</script>
+ 
 
 <!-- Markdeep: --><style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style><script src="markdeep.min.js"></script><script src="https://casual-effects.com?"></script><script>window.alreadyProcessedMarkdeep||(document.body.style.visibility="visible")</script>
